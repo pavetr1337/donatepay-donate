@@ -20,7 +20,7 @@ dp_donate_pv.nickname = "@pavetr" -- Никнейм на DonatePay(https://donat
 dp_donate_pv.paycurrency = "RUB" -- ВАЖНО! Валюта, в которой идут все товары, баланс и ОПЛАТА. Может быть RUB,USD,EUR или UAH
 dp_donate_pv.bind = KEY_F6 -- Кнопка на открытие меню доната
 dp_donate_pv.ccmd = "/donate" -- Команда в чате на открытие меню доната
-dp_donate_pv.prefix = "[DonatePay] " -- Префикс логов сервера
+dp_donate_pv.prefix = "[DonatePay] " -- Префикс логов и сообщений
 
 dp_donate_pv.billingExpire = 0 -- Сколько действует платежная ссылка(в секундах, например 30*60 - полчаса), 0 - чтобы отключить таймер
 dp_donate_pv.minsum = 25 -- Минимальная сумма доната в вашей валюте, для рублей это 25
@@ -31,6 +31,8 @@ dp_donate_pv.admin_ranks = { -- Ранги, которые могут польз
 	["superadmin"] = true
 }
 
+dp_donate_pv.defaultImage = "https://i.imgur.com/r6EFPFF.png" -- Стандартная картинка если не установлена другая
+dp_donate_pv.defaultDesc = "Купив этот предмет вы будете очень крутым" -- Стандартное описание если не установлено другое
 dp_donate_pv.tabs = { -- Категории в донате
 	"Группы",
 	"Оружие",
@@ -99,7 +101,9 @@ dp_donate_pv.items = { -- Предметы
 		["title"] = "Пистолет P228", -- Название
 		["category"] = "Оружие", -- Категория - должна быть как в таблице dp_donate_pv.tabs
 		["price"] = 25, -- Цена
-		["weapon"] = "weapon_pistol" -- [Для оружий] Класс оружия для выдачи
+		["weapon"] = "weapon_pistol", -- [Для оружий] Класс оружия для выдачи
+		["desc"] = "Старый пожилой пистолет деда", -- [Необязательно] Описание в карточке
+		["image"] = "https://pavetr.ru/static/pvlogo-new.jpg" -- [Необязательно] Прямая ссылка для картинки в карточке
 	},
 	{
 		["id"] = "fa_admin", -- Айди
@@ -169,6 +173,8 @@ dp_donate_pv.locales = { -- Язык
 	["nickclm"] = "Ник",
 	["sidclm"] = "Стимайди",
 	["themes"] = "Темы",
+	["dontleave"] = "НЕ ВЫХОДИТЕ С СЕРВЕРА ДО ЗАЧИСЛЕНИЯ СРЕДСТВ!",
+	["description"] = "Описание",
 }
 
 dp_donate_pv.acmd = { -- Админ-Команды

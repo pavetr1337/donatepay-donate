@@ -38,6 +38,7 @@ if SERVER then
 			fCallback(_,pl)
 		end)
 	end
+
 	net_ReceiveProtected("dp_updatemoney", function(len,reqPl)
 		dp_donate_pv.validatePlayer(reqPl)
 		local val = sql.QueryValue("SELECT balance FROM donatepay_main WHERE sid64 = " .. sql.SQLStr( reqPl:SteamID64() ) .. ";")
@@ -101,7 +102,7 @@ function dp_donate_pv.createBill(ply,sum)
 			if dp_donate_pv.billingExpire ~= 0 then
 				ply:ChatPrint("У вас есть "..math.Round(dp_donate_pv.billingExpire/60).." минут чтобы оплатить счет!")
 			end
-			ply:ChatPrint("НЕ ВЫХОДИТЕ С СЕРВЕРА ДО ЗАЧИСЛЕНИЯ СРЕДСТВ!")
+			ply:ChatPrint(dp_donate_pv.locales["dontleave"])
 			ply:ChatPrint("Баланс обновляется автоматически каждые "..dp_donate_pv.refreshRate.." секунд")
 		else
 			ply:SendLua('Derma_Message("Минимальная сумма пополнения "..dp_donate_pv.minsum..dp_donate_pv.currency.."!","Автодонат")')
@@ -171,6 +172,20 @@ end
 
 --Menu
 if CLIENT then
+	if file.Exists("dp_autodonate/theme.txt","DATA") then
+		local theme = file.Read("dp_autodonate/theme.txt","DATA")
+		if istable(dp_donate_pv.colors[theme]) then
+			dp_donate_pv.theme = theme
+		end
+	end
+
+	if file.Exists("dp_autodonate/icostyle.txt","DATA") then
+		local icons = file.Read("dp_autodonate/icostyle.txt","DATA")
+		if istable(dp_donate_pv.icons[icons]) then
+			dp_donate_pv.icostyle = icons
+		end
+	end
+
 	surface.CreateFont("dp.main", {
 		font = "Arial",
 		extended = true,
@@ -192,6 +207,187 @@ if CLIENT then
 	local curtab = 0
 	function dp_donate_pv.lightcol(color,mul)
 		return Color(color.r*mul,color.g*mul,color.b*mul,color.a or 255)
+	end
+	local cardtgle = false
+	function dp_donate_pv.showItemCard(inum)
+		if cardtgle then chat.AddText(dp_donate_pv.prefix.."Закройте предыдущую вкладку с товаром!") return end
+		cardtgle = true
+		local itable = dp_donate_pv.items[inum]
+		if not istable(itable) then return end
+
+		local cfr = vgui.Create("DFrame")
+		cfr:SetTitle("")
+		cfr:SetSize(sw/5,sh/2)
+		cfr:Center()	
+		cfr:ShowCloseButton(false)		
+		cfr:MakePopup()
+		local padding = 30
+		cfr.Paint = function(self,w,h)
+			draw.RoundedBox(15,0,0,w,h,dp_donate_pv.colors[dp_donate_pv.theme]["outline"])
+			draw.RoundedBox(15,dp_donate_pv.style["outline"],dp_donate_pv.style["outline"],w-dp_donate_pv.style["outline"]*2,h-dp_donate_pv.style["outline"]*2,dp_donate_pv.colors[dp_donate_pv.theme]["background"])
+			draw.RoundedBox(10,dp_donate_pv.style["outline"],dp_donate_pv.style["outline"],w-dp_donate_pv.style["outline"]*2,25,dp_donate_pv.colors[dp_donate_pv.theme]["second"])
+			draw.RoundedBox(10,padding/2,padding/2+25,w-padding,h-padding-25,dp_donate_pv.colors[dp_donate_pv.theme]["third"])
+		end
+		local fw = cfr:GetWide()
+		local fh = cfr:GetTall()
+		local dw = fw-padding
+		local dh = fh-padding-25
+		local dx = padding/2
+		local dy = padding/2+25
+		local b_close = vgui.Create("DButton",cfr)
+		b_close:SetText("")
+		b_close:SetPos(7,6)
+		b_close:SetSize(uiSize,uiSize)
+		b_close.Paint = function(self,w,h)
+			if self:IsHovered() then
+				draw.RoundedBox(40,0,0,w,h,Color(230,50,86))
+				draw.SimpleText("X","dp.main",w/2,0,Color(92,92,92,200),TEXT_ALIGN_CENTER,TEXT_ALIGN_TOP)
+			else
+				draw.RoundedBox(40,0,0,w,h,Color(202,19,55))
+			end
+		end
+		b_close.DoClick = function()
+			cardtgle = false
+			cfr:Close()
+		end
+		local b_max = vgui.Create("DPanel",cfr)
+		b_max:SetText("")
+		b_max:SetPos(7+uiSize*1.2,6)
+		b_max:SetSize(uiSize,uiSize)
+		b_max.Paint = function(self,w,h)
+			draw.RoundedBox(40,0,0,w,h,Color(227,152,37))
+		end
+		local b_min = vgui.Create("DPanel",cfr)
+		b_min:SetText("")
+		b_min:SetPos(7+uiSize*2.4,6)
+		b_min:SetSize(uiSize,uiSize)
+		b_min.Paint = function(self,w,h)
+			draw.RoundedBox(40,0,0,w,h,Color(32,159,34))
+		end
+
+		local itemname = vgui.Create("DButton",cfr)
+		itemname:SetFont("dp.main")
+		itemname:SetTextColor(dp_donate_pv.colors[dp_donate_pv.theme]["text"])
+		itemname:SetText(itable["title"])
+		itemname:SetSize(dw,25)
+		itemname:SetPos(dx,dy)
+		itemname.Paint = function(self,w,h)
+			draw.RoundedBox(5,0,0,w,h,dp_donate_pv.colors[dp_donate_pv.theme]["second"])
+		end
+		itemname:SetMouseInputEnabled(false)
+
+		local itemmat = "icon16/error.png"
+		if isstring(itable["image"]) then
+			itemmat = dp_donate_pv.downloadImage(itable["image"],string.sub(itable["image"],#itable["image"]-8,#itable["image"]))
+		elseif isstring(dp_donate_pv.defaultImage) then
+			itemmat = dp_donate_pv.downloadImage(dp_donate_pv.defaultImage,"default_donate.png")
+		end
+
+		local item_img = vgui.Create("DImage", cfr)
+		item_img:SetPos(dx+10,dy+25+10)
+		item_img:SetSize(100,100)		
+		item_img:SetImage(itemmat)
+
+		local itemprice = vgui.Create("DButton",cfr)
+		itemprice:SetFont("dp.main")
+		itemprice:SetTextColor(dp_donate_pv.colors[dp_donate_pv.theme]["text"])
+		itemprice:SetText(itable["price"]..dp_donate_pv.currency)
+		itemprice:SetSize(dw-130,25*3)
+		itemprice:SetPos(dx+120,dy+35+27)
+		itemprice.Paint = function(self,w,h)
+			draw.RoundedBox(5,0,0,w,h,dp_donate_pv.colors[dp_donate_pv.theme]["background"])
+		end
+		itemprice:SetMouseInputEnabled(false)
+
+		local itempricehdr = vgui.Create("DButton",cfr)
+		itempricehdr:SetFont("dp.main")
+		itempricehdr:SetTextColor(dp_donate_pv.colors[dp_donate_pv.theme]["text"])
+		itempricehdr:SetText("Цена")
+		itempricehdr:SetSize(dw-130,25)
+		itempricehdr:SetPos(dx+120,dy+35)
+		itempricehdr.Paint = function(self,w,h)
+			draw.RoundedBox(5,0,0,w,h,dp_donate_pv.colors[dp_donate_pv.theme]["second"])
+		end
+		itempricehdr:SetMouseInputEnabled(false)
+
+		local itemdesc = vgui.Create("RichText",cfr)
+		itemdesc:SetSize(dw-20,25+dh/2.1)
+		itemdesc:SetPos(dx+10,dy+145+50+25)
+		itemdesc.Paint = function(self,w,h)
+			draw.RoundedBox(5,0,0,w,h,dp_donate_pv.colors[dp_donate_pv.theme]["background"])
+		end
+		function itemdesc:PerformLayout()
+			self:SetFontInternal("dp.main")
+			self:SetFGColor(dp_donate_pv.colors[dp_donate_pv.theme]["text"])
+		end
+
+		local desc = "Купив этот предмет вы будете очень крутым"
+		if isstring(itable["desc"]) then
+			desc = itable["desc"]
+		elseif isstring(dp_donate_pv.defaultDesc) then
+			desc = dp_donate_pv.defaultDesc
+		end
+		itemdesc:SetText(desc)
+
+		local itemdeschdr = vgui.Create("DButton",cfr)
+		itemdeschdr:SetFont("dp.main")
+		itemdeschdr:SetTextColor(dp_donate_pv.colors[dp_donate_pv.theme]["text"])
+		itemdeschdr:SetText(dp_donate_pv.locales["description"])
+		itemdeschdr:SetSize(dw-20,25)
+		itemdeschdr:SetPos(dx+10,dy+145+50)
+		itemdeschdr.Paint = function(self,w,h)
+			draw.RoundedBox(5,0,0,w,h,dp_donate_pv.colors[dp_donate_pv.theme]["second"])
+		end
+		itemdeschdr:SetMouseInputEnabled(false)
+
+		local itembuy = vgui.Create("DButton",cfr)
+		itembuy:SetFont("dp.main")
+		itembuy:SetTextColor(dp_donate_pv.colors[dp_donate_pv.theme]["text"])
+		itembuy:SetText(dp_donate_pv.locales["buy"])
+		itembuy:SetSize(dw-20,40)
+		itembuy:SetPos(dx+10,dy+145)
+		itembuy.Paint = function(self,w,h)
+			if self:IsHovered() then
+				draw.RoundedBox(5,0,0,w,h,dp_donate_pv.lightcol(dp_donate_pv.colors[dp_donate_pv.theme]["second"],1.2))
+			else
+				draw.RoundedBox(5,0,0,w,h,dp_donate_pv.colors[dp_donate_pv.theme]["second"])
+			end
+		end
+		itembuy.DoClick = function()
+			local lp = LocalPlayer()
+			if isnumber(itable["max"]) and not table.IsEmpty(dp_donate_pv.getItems(lp)) and dp_donate_pv.getItemRep(lp,itable["id"]) >= itable["max"] then Derma_Message("Вы достигли лимита покупки этого предмета!") return end
+			if dp_donate_pv.affordDonate(lp,itable["price"]) then
+				net.Start("dp_buyitem")
+				net.WriteInt(inum,32)
+				net.SendToServer()
+				Derma_Message("Вы успешно купили "..itable["title"].."!","Автодонат")
+			else
+				Derma_Query(
+				    "Вам не хватает "..itable["price"]-dp_donate_pv.getMoney(lp)..dp_donate_pv.currency.."! Хотите пополнить счет?",
+				    "Автодонат",
+				    "Да",
+				    function()
+				    	Derma_StringRequest(
+							"Автодонат", 
+							"Введите сумму для пополнения. ВАЖНО: При пополнении не меняйте никакие данные!",
+							tostring(itable["price"]),
+							function(text)
+								if tonumber(text) then
+									net.Start("dp_refill")
+							    	net.WriteInt(text,32)
+							    	net.SendToServer()
+							    else
+							    	chat.AddText("Вы ввели некорректное число!")
+							    end
+							end,
+							function(text) chat.AddText("Вы закрыли окно пополнения!") end
+						)
+				    end,
+					"Нет",
+					function() end
+				)
+			end
+		end
 	end
 
 	local atoggle = false
@@ -448,6 +644,8 @@ if CLIENT then
 		    for title, _ in pairs(dp_donate_pv.colors) do
 		        theme:AddOption(title, function()
 		            dp_donate_pv.theme = title
+		            file.Write("dp_autodonate/theme.txt",title)
+
 		        end):SetTextColor(dp_donate_pv.colors[dp_donate_pv.theme]["text"])
 		    end
 		    theme:AddSpacer()
@@ -461,6 +659,7 @@ if CLIENT then
 		    for title, _ in pairs(dp_donate_pv.icons) do
 		        theme:AddOption(title, function()
 		            dp_donate_pv.icostyle = title
+		            file.Write("dp_autodonate/icostyle.txt",title)
 		        end):SetTextColor(dp_donate_pv.colors[dp_donate_pv.theme]["text"])
 		    end
 
@@ -547,6 +746,7 @@ if CLIENT then
 				label:SetPos(0,0)
 				label.Paint = function(self,w,h)
 				end
+				label:SetMouseInputEnabled(false)
 				--label:SetSize(cw,30)
 				local price = vgui.Create("DButton",card)
 				price:SetFont("dp.main")
@@ -556,53 +756,22 @@ if CLIENT then
 				price:SetPos(0,cw/6)
 				price.Paint = function(self,w,h)
 				end
-				local buy = vgui.Create("DButton",card)
-				buy:SetFont("dp.main")
-				buy:SetTextColor(dp_donate_pv.colors[dp_donate_pv.theme]["text"])
-				buy:SetText(dp_donate_pv.locales["buy"])
-				buy:SetSize(cw,30)
-				buy:SetPos(0,ch-30)
-				buy.Paint = function(self,w,h)
+				price:SetMouseInputEnabled(false)
+				local showDesc = vgui.Create("DButton",card)
+				showDesc:SetFont("dp.main")
+				showDesc:SetTextColor(dp_donate_pv.colors[dp_donate_pv.theme]["text"])
+				showDesc:SetText(dp_donate_pv.locales["buy"])
+				showDesc:SetSize(cw,30)
+				showDesc:SetPos(0,ch-30)
+				showDesc.Paint = function(self,w,h)
 					if self:IsHovered() then
 						draw.RoundedBox(5,0,0,w,h,dp_donate_pv.lightcol(dp_donate_pv.colors[dp_donate_pv.theme]["second"],1.2))
 					else
 						draw.RoundedBox(5,0,0,w,h,dp_donate_pv.colors[dp_donate_pv.theme]["second"])
 					end
 				end
-				buy.DoClick = function()
-					if isnumber(dp_donate_pv.items[i]["max"]) and not table.IsEmpty(dp_donate_pv.getItems(LocalPlayer())) and dp_donate_pv.getItemRep(LocalPlayer(),dp_donate_pv.items[i]["id"]) >= dp_donate_pv.items[i]["max"] then Derma_Message("Вы достигли лимита покупки этого предмета!") return end
-					if dp_donate_pv.affordDonate(lp,dp_donate_pv.items[i]["price"]) then
-						net.Start("dp_buyitem")
-						net.WriteInt(i,32)
-						net.SendToServer()
-						Derma_Message("Вы успешно купили "..dp_donate_pv.items[i]["title"].."!","Автодонат")
-					else
-						--Derma_Message("Вам не хватает "..dp_donate_pv.items[i]["price"]-dp_donate_pv.getMoney(lp)..dp_donate_pv.currency.."!", "Автодонат")
-						Derma_Query(
-						    "Вам не хватает "..dp_donate_pv.items[i]["price"]-dp_donate_pv.getMoney(lp)..dp_donate_pv.currency.."! Хотите пополнить счет?",
-						    "Автодонат",
-						    "Да",
-						    function()
-						    	Derma_StringRequest(
-									"Автодонат", 
-									"Введите сумму для пополнения. ВАЖНО: При пополнении не меняйте никакие данные!",
-									tostring(dp_donate_pv.items[i]["price"]),
-									function(text)
-										if tonumber(text) then
-											net.Start("dp_refill")
-									    	net.WriteInt(text,32)
-									    	net.SendToServer()
-									    else
-									    	chat.AddText("Вы ввели некорректное число!")
-									    end
-									end,
-									function(text) chat.AddText("Вы закрыли окно пополнения!") end
-								)
-						    end,
-							"Нет",
-							function() end
-						)
-					end
+				showDesc.DoClick = function()
+					dp_donate_pv.showItemCard(i)
 				end
 
 				list:AddItem(card)
